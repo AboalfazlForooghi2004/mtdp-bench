@@ -1,0 +1,138 @@
+# Rendered once per tenant by prov/provision.py.
+# Every object carries mtdp.io/* labels so the harvester can attribute
+# kernel state (conntrack entries, service entries) back to a tenant.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ ns }}
+  labels:
+    mtdp.io/tenant: "{{ tenant_id }}"
+    mtdp.io/archetype: "{{ archetype }}"
+    mtdp.io/role: "{{ role }}"
+    mtdp.io/campaign: "{{ campaign_id }}"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: {{ ns }}
+spec:
+  hard:
+    requests.cpu: "{{ quota_cpu_requests }}"
+    requests.memory: "{{ quota_mem_requests }}"
+    limits.cpu: "{{ quota_cpu_limits }}"
+    limits.memory: "{{ quota_mem_limits }}"
+    pods: "{{ (replicas * services) + 4 }}"
+    services: "{{ services }}"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-defaults
+  namespace: {{ ns }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "500m"
+        memory: "256Mi"
+      defaultRequest:
+        cpu: "50m"
+        memory: "64Mi"
+{% for svc in range(services) %}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-{{ svc }}
+  namespace: {{ ns }}
+  labels:
+    mtdp.io/tenant: "{{ tenant_id }}"
+    mtdp.io/svc: "{{ svc }}"
+spec:
+  replicas: {{ replicas }}
+  selector:
+    matchLabels:
+      mtdp.io/tenant: "{{ tenant_id }}"
+      mtdp.io/svc: "{{ svc }}"
+  template:
+    metadata:
+      labels:
+        mtdp.io/tenant: "{{ tenant_id }}"
+        mtdp.io/svc: "{{ svc }}"
+        mtdp.io/archetype: "{{ archetype }}"
+    spec:
+      # Spread across workers so that per-node state pressure is realistic.
+      # Without this the whole population lands on a few nodes and the
+      # conntrack-utilisation result is an artefact of the scheduler.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              mtdp.io/campaign: "{{ campaign_id }}"
+      containers:
+        - name: echo
+          image: {{ registry }}/mtdp-echo-backend:{{ image_tag }}
+          args:
+            - "--listen=:8080"
+            - "--payload-bytes={{ payload_bytes }}"
+            - "--tenant={{ tenant_id }}"
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 1
+            periodSeconds: 2
+          resources:
+            requests: {cpu: "{{ cpu_request }}", memory: "64Mi"}
+            limits: {cpu: "{{ cpu_limit }}", memory: "256Mi"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-{{ svc }}
+  namespace: {{ ns }}
+  labels:
+    mtdp.io/tenant: "{{ tenant_id }}"
+    mtdp.io/svc: "{{ svc }}"
+spec:
+  type: ClusterIP
+  selector:
+    mtdp.io/tenant: "{{ tenant_id }}"
+    mtdp.io/svc: "{{ svc }}"
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http
+{% endfor %}
+{% for np in range(network_policies) %}
+---
+# Policy count is held constant across datapaths. Policy *scale* is an
+# explicit non-goal of this study (limitation L5) -- these exist only so that
+# each datapath has to program a comparable, non-zero policy set.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-isolation-{{ np }}
+  namespace: {{ ns }}
+spec:
+  podSelector:
+    matchLabels:
+      mtdp.io/svc: "{{ np }}"
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              mtdp.io/tenant: "{{ tenant_id }}"
+        - namespaceSelector:
+            matchLabels:
+              mtdp.io/loadgen: "true"
+      ports:
+        - protocol: TCP
+          port: 8080
+{% endfor %}
