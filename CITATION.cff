@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use MTDP-Bench, please cite the paper below."
+title: "MTDP-Bench: A Multi-Tenant Datapath Benchmark for Kubernetes"
+authors:
+  - family-names: Forughi
+    given-names: Abolfazl
+    email: ab.forooghi2004@gmail.com
+    affiliation: "Shahid Mohammad Montazeri Faculty, Mashhad, Iran"
+repository-code: "https://github.com/AboalfazlForooghi2004/mtdp-bench"
+license: Apache-2.0
+version: "0.1.0"
+date-released: "2026-08-03"
+preferred-citation:
+  type: article
+  title: "eBPF vs Traditional Datapaths in Multi-Tenant Kubernetes Environments: An Empirical Study of Performance, Scalability, and Resource Isolation Trade-offs"
+  authors:
+    - family-names: Forughi
+      given-names: Abolfazl
+  year: 2026
