@@ -1,0 +1,22 @@
+# DP-IPVS: kube-proxy in IPVS mode, round-robin scheduler.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-proxy
+  namespace: kube-system
+data:
+  config.conf: |-
+    apiVersion: kubeproxy.config.k8s.io/v1alpha1
+    kind: KubeProxyConfiguration
+    mode: "ipvs"
+    clusterCIDR: "10.244.0.0/16"
+    ipvs:
+      scheduler: "rr"
+      minSyncPeriod: 1s
+      syncPeriod: 30s
+      strictARP: true
+    conntrack:
+      maxPerCore: 0
+      min: 4194304
+      tcpEstablishedTimeout: 86400s
+      tcpCloseWaitTimeout: 3600s

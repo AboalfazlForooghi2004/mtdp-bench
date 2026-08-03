@@ -1,0 +1,45 @@
+# DP-EBPF: Cilium 1.16.x, kube-proxy fully replaced.
+# Hubble is DISABLED on purpose: principle P1 forbids measuring the datapath
+# with an observability path that itself runs in the datapath.
+kubeProxyReplacement: true
+k8sServiceHost: ""      # set by scripts/install-datapath.sh
+k8sServicePort: 6443
+
+routing:
+  mode: native
+routingMode: native
+ipv4NativeRoutingCIDR: "10.244.0.0/16"
+autoDirectNodeRoutes: true
+
+ipam:
+  mode: kubernetes
+
+bpf:
+  masquerade: true
+  ctTcpMax: 524288       # swept to 2097152 in the FM-1 sensitivity run
+  ctAnyMax: 262144
+  preallocateMaps: false
+  hostLegacyRouting: false
+
+hubble:
+  enabled: false
+  relay:
+    enabled: false
+  ui:
+    enabled: false
+
+prometheus:
+  enabled: true
+  port: 9962
+operator:
+  prometheus:
+    enabled: true
+
+mtu: 1500
+enableIPv4Masquerade: true
+enableIPv6: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi

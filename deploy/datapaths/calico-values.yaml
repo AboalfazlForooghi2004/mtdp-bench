@@ -1,0 +1,15 @@
+# Cross-validation arm (paper limitation L4): a second eBPF implementation.
+# Only used for the reduced cross-check campaign, not the main results.
+installation:
+  calicoNetwork:
+    linuxDataplane: BPF
+    bgp: Disabled
+    ipPools:
+      - cidr: "10.244.0.0/16"
+        encapsulation: None
+        natOutgoing: Enabled
+felixConfiguration:
+  bpfEnabled: true
+  bpfKubeProxyIptablesCleanupEnabled: true
+  bpfExternalServiceMode: Tunnel
+  bpfLogLevel: ""
