@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mtdp-run
+  namespace: mtdp-system
+data:
+  # Overwritten by scripts/install-datapath.sh before each arm.
+  datapath: "unknown"
+  campaign: "dev"
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mtdp-harvester
+  namespace: mtdp-system
+  labels:
+    app.kubernetes.io/name: mtdp-harvester
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mtdp-harvester
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mtdp-harvester
+    spec:
+      serviceAccountName: mtdp-harvester
+      # hostNetwork + hostPID are required to see the node's real conntrack
+      # table and the cilium-agent/kube-proxy processes. This is a measurement
+      # tool for a dedicated testbed, not for a shared cluster.
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      priorityClassName: system-node-critical
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: harvester
+          image: ghcr.io/aboalfazlforooghi2004/mtdp-harvester:v0.1.0
+          args: ["--interval-s=5"]
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [NET_ADMIN, SYS_ADMIN, BPF, PERFMON]
+          env:
+            - name: MTDP_NODE
+              valueFrom:
+                fieldRef: {fieldPath: spec.nodeName}
+            - name: MTDP_DATAPATH
+              valueFrom:
+                configMapKeyRef: {name: mtdp-run, key: datapath}
+            - name: MTDP_CAMPAIGN
+              valueFrom:
+                configMapKeyRef: {name: mtdp-run, key: campaign}
+            - name: MTDP_PROC
+              value: /host/proc
+            - name: MTDP_SYS
+              value: /host/sys
+          volumeMounts:
+            - {name: proc, mountPath: /host/proc, readOnly: true}
+            - {name: sys, mountPath: /host/sys, readOnly: true}
+            - {name: bpffs, mountPath: /sys/fs/bpf}
+            - {name: cilium-run, mountPath: /var/run/cilium}
+          resources:
+            # Capped so the harvester cannot become a confounder itself.
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+      volumes:
+        - {name: proc, hostPath: {path: /proc}}
+        - {name: sys, hostPath: {path: /sys}}
+        - {name: bpffs, hostPath: {path: /sys/fs/bpf, type: DirectoryOrCreate}}
+        - {name: cilium-run, hostPath: {path: /var/run/cilium, type: DirectoryOrCreate}}

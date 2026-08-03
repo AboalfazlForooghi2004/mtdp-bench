@@ -1,0 +1,16 @@
+# Smoke-test cluster ONLY. Results produced on kind are NOT comparable to the
+# paper: kind nodes share one kernel and therefore one conntrack table, so
+# per-node state isolation -- the central mechanism this study measures -- does
+# not exist here.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: mtdp
+networking:
+  disableDefaultCNI: true      # we install the datapath under test ourselves
+  kubeProxyMode: none          # scripts/install-datapath.sh enables the arm
+  podSubnet: "10.244.0.0/16"
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker
+  - role: worker
