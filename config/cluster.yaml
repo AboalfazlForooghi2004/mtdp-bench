@@ -1,0 +1,32 @@
+# Reference testbed. preflight.sh asserts the live cluster matches the
+# invariants below; it does NOT assert the exact hardware.
+version: 1
+nodes:
+  control_plane: 3
+  workers: 13
+node_hardware:
+  cpu: "2x Intel Xeon Silver 4314 (32 cores @ 2.4 GHz)"
+  memory: "128 GB DDR4-3200"
+  nic: "Mellanox ConnectX-5, 25 GbE"
+  fabric: "single non-blocking leaf switch"
+software:
+  os: "Ubuntu 24.04 LTS"
+  kernel: "6.8.0"
+  containerd: "1.7.x"
+  kubernetes: "v1.31.4"
+  cilium: "1.16.x"
+  calico: "3.28.x"
+  conntrack_tools: "1.4.8"
+
+# Invariants that MUST hold identically across all three datapaths (P1).
+invariants:
+  sysctl:
+    net.netfilter.nf_conntrack_max: 4194304
+    net.netfilter.nf_conntrack_buckets: 1048576
+    net.core.somaxconn: 4096
+    net.ipv4.tcp_tw_reuse: 1
+    net.ipv4.ip_local_port_range: "10000 65535"
+  mtu: 1500
+  cpu_governor: performance
+  irqbalance: disabled
+  transparent_hugepage: madvise

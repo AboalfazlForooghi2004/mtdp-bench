@@ -1,0 +1,49 @@
+# MTDP-Bench tenant population model.
+# Shares must sum to 1.0. Validated by prov/provision.py at load time.
+version: 1
+archetypes:
+  - name: T-Web
+    share: 0.50
+    role: neutral
+    replicas: 2
+    keepalive_conns: 200      # long-lived HTTP/1.1 keep-alive connections
+    new_conns_per_s: 0
+    ct_lifetime_s: 0          # 0 => governed by keep-alive, not by churn
+    rps: 800
+    nominal_gbps: 0.045
+    greediness: 1.00
+  - name: T-Churn
+    share: 0.20
+    role: neutral
+    replicas: 2
+    keepalive_conns: 0
+    new_conns_per_s: 2000     # W4 raises this to 8000
+    ct_lifetime_s: 60.0       # nf_conntrack tcp_timeout_time_wait dominates
+    active_lifetime_s: 1.2
+    rps: 2000
+    nominal_gbps: 0.030
+    greediness: 1.10
+  - name: T-Bulk
+    share: 0.20
+    role: aggressor
+    replicas: 2
+    keepalive_conns: 8
+    new_conns_per_s: 0
+    rps: 0
+    nominal_gbps: 0.800       # W3 pins this to a constant 1.5 Gbps
+    greediness: 1.60
+  - name: T-Latency
+    share: 0.10
+    role: victim
+    replicas: 2
+    keepalive_conns: 8
+    new_conns_per_s: 0
+    rps: 50
+    nominal_gbps: 0.004
+    greediness: 0.80
+
+# Per-tenant Kubernetes objects. Drives deploy/tenant/templates.
+per_tenant_objects:
+  services: 6                 # => SERVICE_ENTRIES_PER_TENANT
+  endpoints_per_service: 2
+  network_policies: 3
